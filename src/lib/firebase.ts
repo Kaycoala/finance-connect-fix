@@ -1,16 +1,13 @@
 import { initializeApp, getApps } from 'firebase/app'
 import { 
-  getAuth, 
-  signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword,
-  signOut,
-  onAuthStateChanged,
-} from 'firebase/auth'
-import { 
   getFirestore, 
   doc, 
   setDoc, 
-  getDoc 
+  getDoc,
+  getDocs,
+  query,
+  collection,
+  where
 } from 'firebase/firestore'
 
 const firebaseConfig = {
@@ -23,7 +20,6 @@ const firebaseConfig = {
 }
 
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0]
-const auth = getAuth(app)
 const db = getFirestore(app)
 
 let currentUser: { uid: string; username: string } | null = null
@@ -56,6 +52,12 @@ function base64ToArrayBuffer(base64: string): ArrayBuffer {
     bytes[i] = binary.charCodeAt(i)
   }
   return bytes.buffer
+}
+
+async function hashPassword(password: string, salt: string): Promise<string> {
+  const data = stringToArrayBuffer(password + salt)
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data)
+  return arrayBufferToBase64(hashBuffer)
 }
 
 async function deriveEncryptionKey(password: string, salt: string): Promise<CryptoKey> {
@@ -105,88 +107,79 @@ async function decryptData(encryptedBase64: string, key: CryptoKey): Promise<str
   }
 }
 
-function usernameToEmail(username: string): string {
-  return `${username.toLowerCase().replace(/[^a-z0-9]/g, '')}@gestorfinanca.app`
+function generateUid(username: string): string {
+  return 'user_' + username.toLowerCase().replace(/[^a-z0-9]/g, '')
 }
 
 export const FirebaseManager = {
   async init(): Promise<{ uid: string; username: string } | null> {
-    return new Promise((resolve) => {
-      const savedSession = localStorage.getItem(SESSION_KEY)
-      if (savedSession) {
-        try {
-          const sessionData = JSON.parse(savedSession)
-          const unsubscribe = onAuthStateChanged(auth, async (user) => {
-            unsubscribe()
-            if (user) {
-              currentUser = { uid: user.uid, username: sessionData.username || user.email?.split('@')[0] || 'Usuario' }
-              if (sessionData.keyData) {
-                userEncryptionKey = await deriveEncryptionKey(sessionData.keyData, user.uid)
-              }
-              resolve(currentUser)
-            } else {
-              localStorage.removeItem(SESSION_KEY)
-              resolve(null)
-            }
-          })
-        } catch {
-          localStorage.removeItem(SESSION_KEY)
-          resolve(null)
+    const savedSession = localStorage.getItem(SESSION_KEY)
+    if (savedSession) {
+      try {
+        const sessionData = JSON.parse(savedSession)
+        if (sessionData.uid && sessionData.username && sessionData.keyData) {
+          currentUser = { uid: sessionData.uid, username: sessionData.username }
+          userEncryptionKey = await deriveEncryptionKey(sessionData.keyData, sessionData.uid)
+          return currentUser
         }
-      } else {
-        const unsubscribe = onAuthStateChanged(auth, (user) => {
-          unsubscribe()
-          if (user) {
-            currentUser = { uid: user.uid, username: user.email?.split('@')[0] || 'Usuario' }
-            resolve(currentUser)
-          } else {
-            resolve(null)
-          }
-        })
+      } catch {
+        localStorage.removeItem(SESSION_KEY)
       }
-    })
+    }
+    return null
   },
 
   async registrar(username: string, senha: string): Promise<{ success: boolean; message: string }> {
     try {
-      const email = usernameToEmail(username)
-      const userCredential = await createUserWithEmailAndPassword(auth, email, senha)
-      const user = userCredential.user
-      await setDoc(doc(db, 'users', user.uid), { username, createdAt: new Date().toISOString() })
+      const uid = generateUid(username)
+      
+      // Check if user already exists
+      const userDoc = await getDoc(doc(db, 'credentials', uid))
+      if (userDoc.exists()) {
+        return { success: false, message: 'Este usuário já existe.' }
+      }
+
+      const passwordHash = await hashPassword(senha, uid)
+      await setDoc(doc(db, 'credentials', uid), { 
+        username, 
+        passwordHash,
+        createdAt: new Date().toISOString() 
+      })
+      
       return { success: true, message: 'Conta criada com sucesso!' }
     } catch (error: unknown) {
       console.error('Registration error:', error)
-      const firebaseError = error as { code?: string }
-      if (firebaseError.code === 'auth/email-already-in-use') return { success: false, message: 'Este usuario ja existe.' }
-      if (firebaseError.code === 'auth/weak-password') return { success: false, message: 'A senha deve ter pelo menos 6 caracteres.' }
       return { success: false, message: 'Erro ao criar conta. Tente novamente.' }
     }
   },
 
   async login(username: string, senha: string): Promise<{ success: boolean; message?: string; user?: typeof currentUser }> {
     try {
-      const email = usernameToEmail(username)
-      const userCredential = await signInWithEmailAndPassword(auth, email, senha)
-      const user = userCredential.user
-      const userDoc = await getDoc(doc(db, 'users', user.uid))
+      const uid = generateUid(username)
+      const userDoc = await getDoc(doc(db, 'credentials', uid))
+      
+      if (!userDoc.exists()) {
+        return { success: false, message: 'Usuário ou senha incorretos.' }
+      }
+
       const userData = userDoc.data()
-      currentUser = { uid: user.uid, username: userData?.username || username }
-      userEncryptionKey = await deriveEncryptionKey(senha, user.uid)
-      localStorage.setItem(SESSION_KEY, JSON.stringify({ uid: user.uid, username: currentUser.username, keyData: senha }))
+      const passwordHash = await hashPassword(senha, uid)
+      
+      if (userData.passwordHash !== passwordHash) {
+        return { success: false, message: 'Usuário ou senha incorretos.' }
+      }
+
+      currentUser = { uid, username: userData.username || username }
+      userEncryptionKey = await deriveEncryptionKey(senha, uid)
+      localStorage.setItem(SESSION_KEY, JSON.stringify({ uid, username: currentUser.username, keyData: senha }))
       return { success: true, user: currentUser }
     } catch (error: unknown) {
       console.error('Login error:', error)
-      const firebaseError = error as { code?: string }
-      if (firebaseError.code === 'auth/user-not-found' || firebaseError.code === 'auth/invalid-credential') {
-        return { success: false, message: 'Usuario ou senha incorretos.' }
-      }
-      if (firebaseError.code === 'auth/wrong-password') return { success: false, message: 'Senha incorreta.' }
       return { success: false, message: 'Erro ao fazer login. Tente novamente.' }
     }
   },
 
   async logout(): Promise<void> {
-    try { await signOut(auth) } catch (error) { console.error('Logout error:', error) }
     localStorage.removeItem(SESSION_KEY)
     userEncryptionKey = null
     currentUser = null
