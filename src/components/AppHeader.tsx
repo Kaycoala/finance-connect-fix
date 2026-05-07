@@ -81,7 +81,10 @@ export function AppHeader({ mesAtual, anoAtual, onMesChange, activeSection, onSe
           <div className="absolute inset-0 bg-black/50" onClick={() => setShowMobileMenu(false)} />
           <div className="absolute left-0 top-0 bottom-0 w-64 bg-card border-r border-border animate-slide-up p-4">
             <div className="flex items-center justify-between mb-6">
-              <img src="/images/logo-pro-interface.png" alt="Logo" className="h-8" />
+              <div>
+                <h1 className="font-display text-lg font-bold tracking-tight bg-gradient-to-r from-primary via-primary to-accent bg-clip-text text-transparent leading-none">Gestor</h1>
+                <p className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground mt-0.5">de Finanças</p>
+              </div>
               <button onClick={() => setShowMobileMenu(false)} className="text-muted-foreground"><X className="w-5 h-5" /></button>
             </div>
             <nav className="space-y-1">
