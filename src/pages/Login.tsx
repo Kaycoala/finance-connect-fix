@@ -59,7 +59,12 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         <div className="bg-card border border-border rounded-2xl p-6 sm:p-8 shadow-lg animate-fade-in">
           <div className="text-center mb-6">
-            <img src="/images/logo-pro-interface.png" alt="Pro Interface Softwares" className="h-14 w-auto mx-auto mb-4" />
+            <div className="mb-4">
+              <h1 className="font-display text-4xl sm:text-5xl font-bold tracking-tight bg-gradient-to-r from-primary via-primary to-accent bg-clip-text text-transparent leading-none">
+                Gestor
+              </h1>
+              <p className="text-xs uppercase tracking-[0.4em] text-muted-foreground mt-2">de Finanças</p>
+            </div>
             <p className="text-muted-foreground text-sm">Controle suas finanças de forma simples e segura</p>
             <div className="inline-flex items-center gap-2 mt-4 px-4 py-2 bg-success/10 border border-success/20 rounded-full text-success text-xs font-medium">
               <Shield className="w-4 h-4" />

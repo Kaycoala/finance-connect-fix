@@ -45,8 +45,11 @@ export function AppSidebar({ activeSection, onSectionChange, isSaving }: AppSide
 
   return (
     <aside className="hidden md:flex fixed top-0 left-0 h-screen w-60 bg-card border-r border-border flex-col z-50">
-      <div className="p-4 border-b border-border">
-        <img src="/images/logo-pro-interface.png" alt="Logo" className="h-10 w-auto mx-auto" />
+      <div className="p-5 border-b border-border text-center">
+        <h1 className="font-display text-xl font-bold tracking-tight bg-gradient-to-r from-primary via-primary to-accent bg-clip-text text-transparent">
+          Gestor
+        </h1>
+        <p className="text-[11px] uppercase tracking-[0.3em] text-muted-foreground mt-0.5">de Finanças</p>
       </div>
       <nav className="flex-1 p-3 space-y-1">
         {navItems.map(item => (
