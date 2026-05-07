@@ -1,7 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Lock, User, Eye, EyeOff, Shield, Loader2 } from 'lucide-react'
+import { Lock, User, Eye, EyeOff, Shield, Loader2, Download } from 'lucide-react'
 import { FirebaseManager } from '@/lib/firebase'
+
+interface BIPEvent extends Event { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> }
 
 export default function LoginPage() {
   const navigate = useNavigate()
@@ -11,6 +13,38 @@ export default function LoginPage() {
   const [message, setMessage] = useState<{ type: 'error' | 'success' | 'info', text: string } | null>(null)
   const [loginData, setLoginData] = useState({ username: '', senha: '' })
   const [cadastroData, setCadastroData] = useState({ username: '', senha: '', confirmarSenha: '' })
+  const [installPrompt, setInstallPrompt] = useState<BIPEvent | null>(null)
+  const [isInstalled, setIsInstalled] = useState(false)
+  const [isIOS, setIsIOS] = useState(false)
+  const [showIOSHelp, setShowIOSHelp] = useState(false)
+
+  useEffect(() => {
+    const ua = window.navigator.userAgent
+    const iOS = /iPad|iPhone|iPod/.test(ua) && !(window as any).MSStream
+    setIsIOS(iOS)
+    const standalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true
+    setIsInstalled(standalone)
+    const handler = (e: Event) => { e.preventDefault(); setInstallPrompt(e as BIPEvent) }
+    window.addEventListener('beforeinstallprompt', handler)
+    const installed = () => setIsInstalled(true)
+    window.addEventListener('appinstalled', installed)
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handler)
+      window.removeEventListener('appinstalled', installed)
+    }
+  }, [])
+
+  const handleInstall = async () => {
+    if (installPrompt) {
+      await installPrompt.prompt()
+      const { outcome } = await installPrompt.userChoice
+      if (outcome === 'accepted') setInstallPrompt(null)
+    } else if (isIOS) {
+      setShowIOSHelp(true)
+    } else {
+      showMessage('Use o menu do navegador para instalar o app', 'info')
+    }
+  }
 
   const showMessage = (text: string, type: 'error' | 'success' | 'info' = 'error') => setMessage({ text, type })
 
@@ -153,6 +187,25 @@ export default function LoginPage() {
             </form>
           )}
         </div>
+
+        {!isInstalled && (
+          <button onClick={handleInstall} className="mt-4 w-full h-12 bg-card border border-border hover:border-primary text-foreground font-medium rounded-xl flex items-center justify-center gap-2 transition-colors">
+            <Download className="w-4 h-4" />
+            Instalar App
+          </button>
+        )}
+
+        {showIOSHelp && (
+          <div className="mt-4 p-4 bg-card border border-border rounded-xl text-sm text-muted-foreground">
+            <p className="font-medium text-foreground mb-2">Para instalar no iOS:</p>
+            <ol className="list-decimal list-inside space-y-1">
+              <li>Toque no botão Compartilhar</li>
+              <li>Selecione "Adicionar à Tela de Início"</li>
+              <li>Toque em "Adicionar"</li>
+            </ol>
+            <button onClick={() => setShowIOSHelp(false)} className="mt-3 text-primary text-xs">Fechar</button>
+          </div>
+        )}
       </div>
     </main>
   )
