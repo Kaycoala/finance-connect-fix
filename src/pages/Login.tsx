@@ -187,6 +187,25 @@ export default function LoginPage() {
             </form>
           )}
         </div>
+
+        {!isInstalled && (
+          <button onClick={handleInstall} className="mt-4 w-full h-12 bg-card border border-border hover:border-primary text-foreground font-medium rounded-xl flex items-center justify-center gap-2 transition-colors">
+            <Download className="w-4 h-4" />
+            Instalar App
+          </button>
+        )}
+
+        {showIOSHelp && (
+          <div className="mt-4 p-4 bg-card border border-border rounded-xl text-sm text-muted-foreground">
+            <p className="font-medium text-foreground mb-2">Para instalar no iOS:</p>
+            <ol className="list-decimal list-inside space-y-1">
+              <li>Toque no botão Compartilhar</li>
+              <li>Selecione "Adicionar à Tela de Início"</li>
+              <li>Toque em "Adicionar"</li>
+            </ol>
+            <button onClick={() => setShowIOSHelp(false)} className="mt-3 text-primary text-xs">Fechar</button>
+          </div>
+        )}
       </div>
     </main>
   )
