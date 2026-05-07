@@ -7,7 +7,7 @@ function formatCurrency(value: number): string {
 }
 
 export function Dashboard() {
-  const { dadosGlobais, dadosMesAtual, getTotalGastos, getSobra, setSalario, setPoupancaTotal, adicionarParaPoupanca } = useData()
+  const { dadosGlobais, dadosMesAtual, getTotalGastos, getSobra, setSalario, adicionarParaPoupanca, getGastosFixosFiltrados } = useData()
 
   const [editingSalario, setEditingSalario] = useState(false)
   const [showDepositModal, setShowDepositModal] = useState(false)
@@ -88,12 +88,12 @@ export function Dashboard() {
         <div className="bg-card border border-border rounded-xl overflow-hidden">
           <div className="flex items-center justify-between p-4 border-b border-border">
             <h3 className="font-semibold text-foreground">Resumo de Gastos</h3>
-            <span className="text-xs bg-secondary px-2 py-1 rounded-full text-muted-foreground">{dadosGlobais.gastosFixos.length} fixos</span>
+            <span className="text-xs bg-secondary px-2 py-1 rounded-full text-muted-foreground">{getGastosFixosFiltrados().length} fixos</span>
           </div>
           <div className="p-4 space-y-3 max-h-64 overflow-y-auto">
-            {dadosGlobais.gastosFixos.length === 0 ? (
+            {getGastosFixosFiltrados().length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-4">Nenhum gasto cadastrado</p>
-            ) : dadosGlobais.gastosFixos.slice(0, 5).map(gasto => {
+            ) : getGastosFixosFiltrados().slice(0, 5).map(gasto => {
               const categoria = dadosGlobais.categorias.find(c => c.id === gasto.categoriaId)
               return (
                 <div key={gasto.id} className="flex items-center justify-between py-2 px-3 bg-secondary/50 rounded-lg">

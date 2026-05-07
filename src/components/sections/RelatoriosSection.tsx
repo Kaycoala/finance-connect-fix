@@ -10,23 +10,27 @@ function formatCurrency(value: number): string {
 }
 
 export function RelatoriosSection() {
-  const { dadosGlobais, dadosMesAtual, getTotalGastosFixos, getTotalGastosMensais, getTotalCartoes, getTotalParcelas } = useData()
+  const { dadosGlobais, dadosMesAtual, getTotalGastosFixos, getTotalGastosMensais, getTotalCartoes, getTotalParcelas, getGastosFixosFiltrados, getParcelasAtivas } = useData()
 
-  const isDark = document.documentElement.getAttribute('data-theme') === 'dark'
+  const isDark = typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
   const textColor = isDark ? '#f8fafc' : '#0f172a'
   const gridColor = isDark ? '#334155' : '#e2e8f0'
 
   const dadosPorCategoria = useMemo(() => {
     const categorias: Record<number, number> = {}
-    dadosGlobais.gastosFixos.forEach(g => { categorias[g.categoriaId || 8] = (categorias[g.categoriaId || 8] || 0) + g.valor })
+    getGastosFixosFiltrados().forEach(g => { categorias[g.categoriaId || 8] = (categorias[g.categoriaId || 8] || 0) + g.valor })
     dadosMesAtual.gastosMensais.forEach(g => { categorias[g.categoriaId || 8] = (categorias[g.categoriaId || 8] || 0) + g.valor })
+    getParcelasAtivas().forEach(p => { categorias[8] = (categorias[8] || 0) + (p.valorTotal / p.numParcelas) })
+    Object.entries(dadosMesAtual.cartoes).forEach(([, itens]) => {
+      itens.forEach(i => { categorias[8] = (categorias[8] || 0) + i.valor })
+    })
     const labels: string[] = [], values: number[] = [], colors: string[] = []
     Object.entries(categorias).forEach(([catId, valor]) => {
       const cat = dadosGlobais.categorias.find(c => c.id === parseInt(catId))
       if (cat && valor > 0) { labels.push(cat.nome); values.push(valor); colors.push(cat.cor) }
     })
     return { labels, values, colors }
-  }, [dadosGlobais, dadosMesAtual])
+  }, [dadosGlobais, dadosMesAtual, getGastosFixosFiltrados, getParcelasAtivas])
 
   const dadosPorTipo = useMemo(() => ({
     labels: ['Gastos Fixos', 'Gastos Mensais', 'Cartões', 'Parcelas'],

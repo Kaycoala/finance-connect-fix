@@ -65,7 +65,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [dadosAlterados, setDadosAlterados] = useState(false)
 
   const chaveMes = getChaveMes(mesAtual, anoAtual)
-  const dadosMesAtual = dadosMeses[chaveMes] || { ...defaultDadosMes }
+  const dadosMesAtual = dadosMeses[chaveMes] || { cartoes: {}, parcelas: [], salario: 0, gastosMensais: [] }
 
   const gerarXML = useCallback(() => {
     let xml = '<?xml version="1.0" encoding="UTF-8"?>\n<financas>\n'
@@ -269,8 +269,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const marcarAlterado = () => setDadosAlterados(true)
 
-  const atualizarMesAtual = (dados: Partial<DadosMes>) => {
-    setDadosMeses(prev => ({ ...prev, [chaveMes]: { ...dadosMesAtual, ...dados } }))
+  const atualizarMesAtual = (updater: Partial<DadosMes> | ((m: DadosMes) => Partial<DadosMes>)) => {
+    setDadosMeses(prev => {
+      const atual = prev[chaveMes] || { cartoes: {}, parcelas: [], salario: 0, gastosMensais: [] }
+      const patch = typeof updater === 'function' ? updater(atual) : updater
+      return { ...prev, [chaveMes]: { ...atual, ...patch } }
+    })
     marcarAlterado()
   }
 
@@ -295,26 +299,49 @@ export function DataProvider({ children }: { children: ReactNode }) {
       setDadosGlobais(prev => ({ ...prev, gastosFixosExcluidosAPartirDe: { ...prev.gastosFixosExcluidosAPartirDe, [id]: getChaveMes(mes, ano) } }))
       marcarAlterado()
     },
-    adicionarGastoMensal: (gasto) => atualizarMesAtual({ gastosMensais: [...dadosMesAtual.gastosMensais, { ...gasto, id: Date.now() }] }),
-    editarGastoMensal: (id, gasto) => atualizarMesAtual({ gastosMensais: dadosMesAtual.gastosMensais.map(g => g.id === id ? { ...g, ...gasto } : g) }),
-    removerGastoMensal: (id) => atualizarMesAtual({ gastosMensais: dadosMesAtual.gastosMensais.filter(g => g.id !== id) }),
-    adicionarItemCartao: (banco, item) => {
-      const cartoes = { ...dadosMesAtual.cartoes }
-      if (!cartoes[banco]) cartoes[banco] = []
-      cartoes[banco] = [...cartoes[banco], { ...item, id: Date.now() }]
-      atualizarMesAtual({ cartoes })
+    adicionarGastoMensal: (gasto) => atualizarMesAtual(m => ({ gastosMensais: [...m.gastosMensais, { ...gasto, id: Date.now() }] })),
+    editarGastoMensal: (id, gasto) => atualizarMesAtual(m => ({ gastosMensais: m.gastosMensais.map(g => g.id === id ? { ...g, ...gasto } : g) })),
+    removerGastoMensal: (id) => atualizarMesAtual(m => ({ gastosMensais: m.gastosMensais.filter(g => g.id !== id) })),
+    adicionarItemCartao: (banco, item) => atualizarMesAtual(m => {
+      const cartoes = { ...m.cartoes }
+      cartoes[banco] = [...(cartoes[banco] || []), { ...item, id: Date.now() }]
+      return { cartoes }
+    }),
+    editarItemCartao: (banco, id, item) => atualizarMesAtual(m => {
+      const cartoes = { ...m.cartoes }
+      if (cartoes[banco]) cartoes[banco] = cartoes[banco].map(i => i.id === id ? { ...i, ...item } : i)
+      return { cartoes }
+    }),
+    removerItemCartao: (banco, id) => atualizarMesAtual(m => {
+      const cartoes = { ...m.cartoes }
+      if (cartoes[banco]) cartoes[banco] = cartoes[banco].filter(i => i.id !== id)
+      return { cartoes }
+    }),
+    adicionarParcela: (parcela) => atualizarMesAtual(m => ({ parcelas: [...m.parcelas, { ...parcela, id: Date.now() }] })),
+    editarParcela: (id, parcela) => {
+      setDadosMeses(prev => {
+        const novo = { ...prev }
+        for (const k in novo) {
+          if (novo[k].parcelas.some(p => p.id === id)) {
+            novo[k] = { ...novo[k], parcelas: novo[k].parcelas.map(p => p.id === id ? { ...p, ...parcela } : p) }
+          }
+        }
+        return novo
+      })
+      marcarAlterado()
     },
-    editarItemCartao: (banco, id, item) => {
-      const cartoes = { ...dadosMesAtual.cartoes }
-      if (cartoes[banco]) { cartoes[banco] = cartoes[banco].map(i => i.id === id ? { ...i, ...item } : i); atualizarMesAtual({ cartoes }) }
+    removerParcela: (id) => {
+      setDadosMeses(prev => {
+        const novo = { ...prev }
+        for (const k in novo) {
+          if (novo[k].parcelas.some(p => p.id === id)) {
+            novo[k] = { ...novo[k], parcelas: novo[k].parcelas.filter(p => p.id !== id) }
+          }
+        }
+        return novo
+      })
+      marcarAlterado()
     },
-    removerItemCartao: (banco, id) => {
-      const cartoes = { ...dadosMesAtual.cartoes }
-      if (cartoes[banco]) { cartoes[banco] = cartoes[banco].filter(i => i.id !== id); atualizarMesAtual({ cartoes }) }
-    },
-    adicionarParcela: (parcela) => atualizarMesAtual({ parcelas: [...dadosMesAtual.parcelas, { ...parcela, id: Date.now() }] }),
-    editarParcela: (id, parcela) => atualizarMesAtual({ parcelas: dadosMesAtual.parcelas.map(p => p.id === id ? { ...p, ...parcela } : p) }),
-    removerParcela: (id) => atualizarMesAtual({ parcelas: dadosMesAtual.parcelas.filter(p => p.id !== id) }),
     adicionarBanco: (nome) => { if (!dadosGlobais.bancos.includes(nome)) { setDadosGlobais(prev => ({ ...prev, bancos: [...prev.bancos, nome] })); marcarAlterado() } },
     removerBanco: (nome) => { setDadosGlobais(prev => ({ ...prev, bancos: prev.bancos.filter(b => b !== nome) })); marcarAlterado() },
     setPoupancaTotal: (valor) => { setDadosGlobais(prev => ({ ...prev, poupancaTotal: valor })); marcarAlterado() },
@@ -326,7 +353,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         poupancaPorMes: { ...prev.poupancaPorMes, [chaveMes]: (prev.poupancaPorMes[chaveMes] || 0) + valor }
       }))
       if (valor > 0) {
-        atualizarMesAtual({ gastosMensais: [...dadosMesAtual.gastosMensais, { id: Date.now(), nome: 'Depósito Poupança', valor, categoriaId: null }] })
+        atualizarMesAtual(m => ({ gastosMensais: [...m.gastosMensais, { id: Date.now(), nome: 'Depósito Poupança', valor, categoriaId: null }] }))
       } else {
         marcarAlterado()
       }
@@ -346,11 +373,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
     getTotalGastosFixos: () => value.getGastosFixosFiltrados().reduce((acc, g) => acc + g.valor, 0),
     getParcelasAtivas: () => {
       const todasParcelas: (Parcela & { parcelaAtual: number })[] = []
+      const seen = new Set<number>()
       for (const chave in dadosMeses) {
         dadosMeses[chave].parcelas.forEach(parcela => {
+          if (seen.has(parcela.id)) return
           const mesesPassados = (anoAtual - parcela.anoInicio) * 12 + (mesAtual - parcela.mesInicio)
           const parcelaAtual = mesesPassados + 1
           if (parcelaAtual >= 1 && parcelaAtual <= parcela.numParcelas) {
+            seen.add(parcela.id)
             todasParcelas.push({ ...parcela, parcelaAtual })
           }
         })
