@@ -373,11 +373,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
     getTotalGastosFixos: () => value.getGastosFixosFiltrados().reduce((acc, g) => acc + g.valor, 0),
     getParcelasAtivas: () => {
       const todasParcelas: (Parcela & { parcelaAtual: number })[] = []
+      const seen = new Set<number>()
       for (const chave in dadosMeses) {
         dadosMeses[chave].parcelas.forEach(parcela => {
+          if (seen.has(parcela.id)) return
           const mesesPassados = (anoAtual - parcela.anoInicio) * 12 + (mesAtual - parcela.mesInicio)
           const parcelaAtual = mesesPassados + 1
           if (parcelaAtual >= 1 && parcelaAtual <= parcela.numParcelas) {
+            seen.add(parcela.id)
             todasParcelas.push({ ...parcela, parcelaAtual })
           }
         })
